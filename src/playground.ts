@@ -177,7 +177,7 @@ let lineChart = new AppendingLineChart(d3.select("#linechart"),
 
 function makeGUI() {
   d3.select("#reset-button").on("click", () => {
-    reset();
+    reset(false, false);
     userHasInteracted();
     d3.select("#play-pause-button");
   });
@@ -324,7 +324,7 @@ function makeGUI() {
   let activationDropdown = d3.select("#activations").on("change", function() {
     state.activation = activations[this.value];
     parametersChanged = true;
-    reset();
+    reset(false, false);
   });
   activationDropdown.property("value",
       getKeyFromValue(activations, state.activation));
@@ -341,7 +341,7 @@ function makeGUI() {
       function() {
     state.regularization = regularizations[this.value];
     parametersChanged = true;
-    reset();
+    reset(false, false);
   });
   regularDropdown.property("value",
       getKeyFromValue(regularizations, state.regularization));
@@ -358,7 +358,7 @@ function makeGUI() {
     generateData();
     drawDatasetThumbnails();
     parametersChanged = true;
-    reset();
+    reset(false, false);
   });
   problem.property("value", getKeyFromValue(problems, state.problem));
 
@@ -753,6 +753,7 @@ function drawLink(
     input: nn.Link, node2coord: {[id: string]: {cx: number, cy: number}},
     network: nn.Node[][], container,
     isFirst: boolean, index: number, length: number) {
+  console.log("Drawing link for: ", input.id);
   let line = container.insert("path", ":first-child");
   let source = node2coord[input.source.id];
   let dest = node2coord[input.dest.id];
@@ -937,7 +938,7 @@ export function getOutputWeights(network: nn.Node[][]): number[] {
   return weights;
 }
 
-function reset(onStartup=false) {
+function reset(onStartup=false, reuseWeights=true) {
   lineChart.reset();
   state.serialize();
   if (!onStartup) {
@@ -953,13 +954,18 @@ function reset(onStartup=false) {
   iter = 0;
   let numInputs = constructInput(0 , 0).length;
   let shape = [numInputs].concat(state.networkShape).concat([1]);
+
   let outputActivation = (state.problem === Problem.REGRESSION) ?
       nn.Activations.LINEAR : nn.Activations.TANH;
+
   network = nn.buildNetwork(shape, state.activation, outputActivation,
-      state.regularization, constructInputIds(), state.initZero);
+      state.regularization, constructInputIds(), state.initZero, reuseWeights);
+
   lossTrain = getLoss(network, trainData);
-  lossTest = getLoss(network, testData);
+  lossTest  = getLoss(network, testData);
+
   drawNetwork(network);
+
   updateUI(true);
 };
 
@@ -1099,17 +1105,9 @@ function userHasInteracted() {
   if (state.tutorial != null && state.tutorial !== '') {
     page = `/v/tutorials/${state.tutorial}`;
   }
-  ga('set', 'page', page);
-  ga('send', 'pageview', {'sessionControl': 'start'});
 }
 
 function simulationStarted() {
-  ga('send', {
-    hitType: 'event',
-    eventCategory: 'Starting Simulation',
-    eventAction: parametersChanged ? 'changed' : 'unchanged',
-    eventLabel: state.tutorial == null ? '' : state.tutorial
-  });
   parametersChanged = false;
 }
 

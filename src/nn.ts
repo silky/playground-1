@@ -148,6 +148,11 @@ export class RegularizationFunction {
   };
 }
 
+
+
+var weightMap = {};
+var nodeMap   = {};
+
 /**
  * A link in a neural network. Each link has a weight and a source and
  * destination node. Also it has an internal state (error derivative
@@ -205,9 +210,17 @@ export function buildNetwork(
     networkShape: number[], activation: ActivationFunction,
     outputActivation: ActivationFunction,
     regularization: RegularizationFunction,
-    inputIds: string[], initZero?: boolean): Node[][] {
+    inputIds: string[], 
+    initZero?: boolean,
+    reuseWeights?: boolean): Node[][] {
   let numLayers = networkShape.length;
-  let id = 1;
+
+  let ids = {};
+
+  for( let i = 0; i < numLayers; i++ ){
+    ids[i] = 1;
+  }
+
   /** List of layers, with each layer being a list of nodes. */
   let network: Node[][] = [];
   for (let layerIdx = 0; layerIdx < numLayers; layerIdx++) {
@@ -217,26 +230,51 @@ export function buildNetwork(
     network.push(currentLayer);
     let numNodes = networkShape[layerIdx];
     for (let i = 0; i < numNodes; i++) {
-      let nodeId = id.toString();
+      let nodeId = "layer_" + layerIdx.toString() + "-id_" + ids[layerIdx].toString();
       if (isInputLayer) {
         nodeId = inputIds[i];
       } else {
-        id++;
+        ids[layerIdx]++;
       }
-      let node = new Node(nodeId,
-          isOutputLayer ? outputActivation : activation, initZero);
+      var node;
+      
+      if (reuseWeights && nodeMap[nodeId]){
+        node = nodeMap[nodeId];
+        node.inputLinks = [];
+        node.outputs    = [];
+      } else {
+        node = new Node(nodeId, isOutputLayer ? outputActivation : activation, initZero);
+        nodeMap[nodeId] = node;
+      }
+
       currentLayer.push(node);
+
       if (layerIdx >= 1) {
         // Add links from nodes in the previous layer to this node.
         for (let j = 0; j < network[layerIdx - 1].length; j++) {
           let prevNode = network[layerIdx - 1][j];
-          let link = new Link(prevNode, node, regularization, initZero);
+          let key      = prevNode.id + "-" + node.id;
+
+          var link;
+
+          console.log("Thinking about key: ", key);
+
+          if( reuseWeights && weightMap[key] ) {
+            console.log("  Using prior weight");
+            link = weightMap[key];
+          } else {
+            console.log("  Making new weight");
+            link = new Link(prevNode, node, regularization, initZero);
+            weightMap[key] = link;
+          }
+
           prevNode.outputs.push(link);
           node.inputLinks.push(link);
         }
       }
     }
   }
+  console.log("--------------- Set up the network ----------------");
   return network;
 }
 

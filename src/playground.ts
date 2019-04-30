@@ -358,7 +358,7 @@ function makeGUI() {
     generateData();
     drawDatasetThumbnails();
     parametersChanged = true;
-    reset(false, false);
+    reset();
   });
   problem.property("value", getKeyFromValue(problems, state.problem));
 
